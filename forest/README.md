@@ -1,34 +1,15 @@
-# FOREST App v0.1
 
-静的な森林観測SPA。外部サービス・ビルド・地図APIは不要です。
-GitHub Pagesがリポジトリルートを配信していれば /forest/ で動作します。
-相対パスとハッシュルーティングを使用するため、詳細画面も再読み込みできます。
+## ホーム画面
+郵便番号で気象を検索し、天候に合わせて背景を切り替えます。郵便番号のみブラウザーに保存し、起動時に最新データを取得します。
+zipcloud → 国土地理院の市区町村代表点 → Open-Meteo（モデル推定、実測ではない）を使用。外部地図表示やAPIキーは不要です。通信失敗・不正入力時は気象数値を表示しません。
+巡回・調査の要請はrequestDispatchでMissionとLOGを作成します。機体のSTANDBY状態は変更せず、実機は起動しません。同じ機体の進行中依頼を重複作成しません。
+気象サービスはweather.jsに分離。無料Open-Meteoエンドポイントは非商用利用向けです。商用化時は利用プランを見直してください。
 
-## ローカル起動
+### 地域設定の保存と削除
+有効な郵便番号で気象取得が成功すると forest.postal.v1 を保存します。保存後は入力欄を隠し、再訪時には保存地域の最新気象を自動取得します。「地域設定を削除」で郵便番号だけを削除し、別の地域を設定できます。MissionやLOGは削除しません。気象取得中の削除でも古い応答で設定が復活しません。ブラウザーの保存データを消した場合や別のブラウザーでは再設定が必要です。
 
-リポジトリルートで python3 -m http.server 8000 を実行し、http://localhost:8000/forest/ を開いてください。
-ES Modulesを使用するため、file:// での直接起動は対象外です。
-
-## 操作
-
-HOME → 要確認の観測 → OBS-0184（Confidence 54%）→ 再観測を依頼する
-→ MISSIONSのREOBSERVE / REQUESTED → LOGの生成記録を確認。
-同じ観測の進行中依頼は重複生成しません。ブラウザーの戻る・進むにも対応します。
-デモ状態はlocalStorageの forest.mock.v1 に保存します。保存不可の場合はメモリーで動作します。
-サンプル画像・位置・テレメトリーは架空で、実機への送信はありません。
-
-## 境界と将来の接続
-
-- mock-data.js: Area / Drone / Observation / Mission とログの初期DTO。
-- store.js: async repository (load / requestReobserve)、状態通知、永続化、重複防止。
-- app.js: 6画面、ハッシュナビゲーション、ユーザー操作。保存処理を持ちません。
-- assets/canopy.svg: 外部通信を必要としないシミュレーション観測画像。
-
-createStoreにGo API repositoryを渡すことでUIを維持して置換できます。
-loadは {data, persistent}、requestReobserveは {mission, duplicate} を返します。
-Go側でPostgreSQLへのMission作成と監査ログを同一トランザクションにし、
-同一観測の進行中Missionを一意制約・冪等性キーで保護してください。
-Mission DTOは target.area_id / observation_id、reason、constraints.max_altitude_m /
-geofence_required を持ちます。Jetson / ROS 2 / PX4への配送・受理・実行状態は
-バックエンドが担い、REQUESTEDだけで飛行開始とみなしません。
-実機接続では認証・承認・ジオフェンス検証・通信断処理が別途必要です。
+## 継続観測とAI自動再観測
+同じarea_id + site_idの撮影日時順で比較します。area_idだけでは比較しません。前回は選択観測より古い同一地点の直近観測です。撮影角度は真下を0度としたデモ値です。画像差分計算は未実装です。
+最新観測のconfidenceが0.7未満なら、Mock repositoryがAIを要求元としてREOBSERVEを一度生成しLOGに記録します。再読み込みや完了後に同じ観測へ自動要求を繰り返しません。古いlocalStorageを移行し、既存のMissionとLOGを保持します。
+再観測デモはREQUESTED → RUNNING → COMPLETEDをボタンで進めます。15m→8m、撮影角度45→25度、機首方位90→135度で撮影する計画を表示し、92%の再判定観測を新規追加します。元の観測は上書きしません。結果は固定のシミュレーションで、実際の飛行・推論・GPU学習は行いません。
+Go APIへの移行では、最新観測取り込み時のルール評価、Missionと監査ログのトランザクション、観測単位の冪等性、位置・飛行条件の検証をサーバー側で実装してください。実機接続前のフロントデモに限定しています。
