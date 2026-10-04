@@ -57,6 +57,33 @@ function comparison(data,o){
  const pane=(item,label)=>'<figure class="comparison-pane"><figcaption>'+label+' · '+e(item.id)+'</figcaption><img src="'+e(item.image_url)+'" alt="'+e(label+'のシミュレーション樹冠画像')+'"><div class="row">'+badge(item.status)+'<strong>'+Math.round(item.confidence*100)+'%</strong></div><p class="muted">'+e(date(item.captured_at))+'<br>高度 '+e(unit(item.altitude_m,'m'))+' / 撮影角度 '+e(unit(item.camera_angle_deg,'°'))+'</p></figure>';
  return '<section class="card comparison"><p class="eyebrow">CONTINUOUS OBSERVATION</p><h2>前回と今回を比較</h2><p class="muted">'+e(o.area_id)+' / '+e(o.site_id||'地点未記録')+' · 同じ地点の撮影履歴</p>'+(previous?'<p class="change-summary">'+e(statusName(previous.status))+' → '+e(statusName(o.status))+'<span>'+ (previous.status!==o.status?'判定の変化あり':'判定は同じ')+'</span></p><div class="comparison-grid">'+pane(previous,'前回観測')+pane(o,'今回観測')+'</div>':'<p>この地点の前回観測はまだありません。</p>'+pane(o,'今回観測'))+'<p class="muted">画像はデモ用です。画素差分の解析は行っていません。</p><h3>観測日時の履歴</h3><ol class="observation-timeline">'+history.map(item=>'<li '+(item.id===o.id?'aria-current="true"':'')+'><a href="#observations/'+e(item.id)+'"><time>'+e(date(item.captured_at))+'</time><span>'+e(item.id)+' · '+e(statusName(item.status))+' · '+Math.round(item.confidence*100)+'%</span></a></li>').join('')+'</ol></section>';
 }
+function missionDetails(m){
+ if(m.source==='API'){
+  const position=m.target.lat!=null&&m.target.lon!=null
+   ? m.target.lat+' / '+m.target.lon
+   : '未指定';
+  return dl([
+   ['要求元','Go API / PostgreSQL'],
+   ['対象クラス',m.target.target_class||'未指定'],
+   ['緯度 / 経度',position],
+   ['目標高度',m.constraints.max_altitude_m!=null?m.constraints.max_altitude_m+' m':'未指定'],
+   ['優先度',m.priority||'未記録'],
+   ['理由',m.reason],
+   ['作成時刻',date(m.created_at)]
+  ]);
+ }
+ return dl([
+  ['要求元',m.source==='AI'?'AI自動要求':'ユーザー'],
+  ['区域',m.target.area_id||'未指定'],
+  ['調査機',m.drone_id||'未指定'],
+  ['対象観測',m.target.observation_id||'区域巡回'],
+  ['理由',m.reason],
+  ['高度上限',m.constraints.max_altitude_m+' m'],
+  ['ジオフェンス',m.constraints.geofence_required?'必須':'任意'],
+  ['作成時刻',date(m.created_at)]
+ ]);
+}
+
 function missionFlow(m,data){
  const original=data.observations.find(o=>o.id===m.target.observation_id);
  const result=data.observations.find(o=>o.id===m.result_observation_id);
@@ -86,7 +113,7 @@ function render(){
  else if(o){html+=detail(data,o);}
  else html+='<label class="filter">状態 <select id="filter">'+['ALL','NORMAL','REVIEW','ANOMALY'].map(s=>'<option '+(s===filter?'selected':'')+'>'+s+'</option>').join('')+'</select></label><div class="grid">'+[...data.observations].sort((a,b)=>Date.parse(b.captured_at)-Date.parse(a.captured_at)).filter(o=>filter==='ALL'||o.status===filter).map(observationCard).join('')+'</div>';
  }
- if(view==='missions') html+='<p class="muted">REQUESTEDは依頼の作成状態です。実機は自動で飛行しません。</p><div class="grid">'+[...data.missions].reverse().map(m=>'<article class="card"><div class="row"><h2>'+e(m.id)+'</h2>'+badge(m.status)+'</div><h3>'+e(m.type)+'</h3>'+dl([['要求元',m.source==='AI'?'AI自動要求':'ユーザー'],['区域',m.target.area_id],['調査機',m.drone_id||'未指定'],['対象観測',m.target.observation_id||'区域巡回'],['理由',m.reason],['高度上限',m.constraints.max_altitude_m+' m'],['ジオフェンス',m.constraints.geofence_required?'必須':'任意'],['作成時刻',date(m.created_at)]])+(m.type==='REOBSERVE'?missionFlow(m,data):'')+(m.target.observation_id?link('observations/'+m.target.observation_id,'対象の観測を見る'):'')+'</article>').join('')+'</div>';
+ if(view==='missions') html+='<p class="muted">REQUESTEDは依頼の作成状態です。実機は自動で飛行しません。</p><div class="grid">'+[...data.missions].reverse().map(m=>'<article class="card"><div class="row"><h2>'+e(m.id)+'</h2>'+badge(m.status)+'</div><h3>'+e(m.type)+'</h3>'+missionDetails(m)+(m.type==='REOBSERVE'?missionFlow(m,data):'')+(m.target.observation_id?link('observations/'+m.target.observation_id,'対象の観測を見る'):'')+'</article>').join('')+'</div>';
  if(view==='drone') html+='<div class="grid">'+data.drones.map(d=>'<article class="card"><p class="eyebrow">SURVEY VEHICLE</p><h2>'+e(d.id)+'</h2>'+badge(d.status)+'<div class="battery"><span style="width:'+d.battery_pct+'%"></span></div>'+dl([['バッテリー',d.battery_pct+'%'],['GPS',d.gps],['Jetson',d.jetson],['高度',d.altitude_m+' m'],['緯度 / 経度',d.position.lat+' / '+d.position.lng],['最終受信',date(d.last_seen_at)]])+'<p class="muted">サンプルの機体テレメトリーです。</p></article>').join('')+'</div>';
  if(view==='log') html+='<div class="timeline">'+data.logs.map(l=>'<article class="card"><p class="eyebrow">'+e(l.event)+'</p><h3>'+e(l.message)+'</h3><p class="muted">'+e(date(l.time))+' · '+e(l.id)+'</p>'+(l.mission_id?link('missions',l.mission_id+'を確認'):'')+'</article>').join('')+'</div>';
  content.innerHTML=html;

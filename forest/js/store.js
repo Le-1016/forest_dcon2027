@@ -7,6 +7,34 @@ import { latestPerSite } from './observation-history.js';
 const copy = value => JSON.parse(JSON.stringify(value));
 const key = 'forest.mock.v1';
 const active = mission => ['REQUESTED', 'ACCEPTED', 'RUNNING'].includes(mission.status);
+const apiMission = row => ({
+  id: row.mission_id,
+  type: row.mission_type,
+  status: row.status,
+  source: 'API',
+  drone_id: null,
+  target: {
+    area_id: null,
+    observation_id: null,
+    target_class: row.target_class,
+    lat: row.target_lat,
+    lon: row.target_lon
+  },
+  reason: row.reason || '未記録',
+  priority: row.priority || '未記録',
+  constraints: {
+    max_altitude_m: row.target_alt,
+    geofence_required: false
+  },
+  created_at: row.created_at
+});
+
+async function fetchApiMissions() {
+  const response = await fetch('/api/missions');
+  if (!response.ok) throw new Error('Mission APIの取得に失敗しました。');
+  const rows = await response.json();
+  return rows.map(apiMission);
+}
 export const LOW_CONFIDENCE_THRESHOLD = 0.7;
 function valid(state) {
   return state && ['areas','drones','observations','missions','logs'].every(k => Array.isArray(state[k])) &&
@@ -65,7 +93,16 @@ export function createMockRepository(storage) {
   evaluateLatest();
   persist();
   return {
-    async load() { return {data:copy(state),persistent}; },
+    async load() {
+      const data = copy(state);
+      const apiMissions = await fetchApiMissions();
+      const apiIds = new Set(apiMissions.map(m => m.id));
+      data.missions = [
+        ...data.missions.filter(m => !apiIds.has(m.id)),
+        ...apiMissions
+      ];
+      return {data,persistent};
+    },
     async requestDispatch({type,drone_id,area_id}) {
       if (!['PATROL','INSPECT'].includes(type)) throw new Error('依頼の種類が不正です。');
       const drone = state.drones.find(d=>d.id===drone_id);

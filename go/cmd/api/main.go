@@ -6,21 +6,23 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Mission struct {
-	ID          int64    `json:"id"`
-	MissionID   string   `json:"mission_id"`
-	MissionType string   `json:"mission_type"`
-	TargetLat   *float64 `json:"target_lat"`
-	TargetLon   *float64 `json:"target_lon"`
-	TargetAlt   *float64 `json:"target_alt"`
-	TargetClass *string  `json:"target_class"`
-	Priority    *string  `json:"priority"`
-	Reason      *string  `json:"reason"`
-	Status      string   `json:"status"`
+	ID          int64     `json:"id"`
+	MissionID   string    `json:"mission_id"`
+	MissionType string    `json:"mission_type"`
+	TargetLat   *float64  `json:"target_lat"`
+	TargetLon   *float64  `json:"target_lon"`
+	TargetAlt   *float64  `json:"target_alt"`
+	TargetClass *string   `json:"target_class"`
+	Priority    *string   `json:"priority"`
+	Reason      *string   `json:"reason"`
+	Status      string    `json:"status"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 func main() {
@@ -49,7 +51,7 @@ func main() {
 			`SELECT
 				id, mission_id, mission_type,
 				target_lat, target_lon, target_alt,
-				target_class, priority, reason, status
+				target_class, priority, reason, status, created_at
 			FROM missions
 			ORDER BY id`,
 		)
@@ -76,6 +78,7 @@ func main() {
 				&item.Priority,
 				&item.Reason,
 				&item.Status,
+				&item.CreatedAt,
 			)
 
 			if err != nil {
