@@ -1,4 +1,29 @@
 services:
+  web:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    volumes:
+      - ./forest:/usr/share/nginx/html:ro
+
+  api:
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+    restart: unless-stopped
+    command: /usr/local/go/bin/go run ./go/cmd/api
+    working_dir: /workspace
+    environment:
+      DATABASE_URL: postgresql://forest_user:forest_password@postgres:5432/forest_db
+    ports:
+      - "8080:8080"
+    volumes:
+      - .:/workspace:cached
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   lab:
     build:
       context: .
