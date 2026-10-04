@@ -1,0 +1,7 @@
+jupyterlab==4.4.7
+ipykernel==6.30.1
+numpy==2.3.3
+pandas==2.3.2
+matplotlib==3.10.6
+psycopg[binary]==3.2.10
+SQLAlchemy==2.0.43
