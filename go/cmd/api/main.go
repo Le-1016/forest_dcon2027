@@ -80,6 +80,84 @@ type CreateMissionRequest struct {
 	Reason      *string  `json:"reason"`
 }
 
+func createMission(ctx context.Context, pool *pgxpool.Pool, req CreateMissionRequest) (Mission, error) {
+	var item Mission
+	err := pool.QueryRow(
+		ctx,
+		`WITH next AS (
+			SELECT nextval(pg_get_serial_sequence('missions', 'id')) AS id
+		)
+		INSERT INTO missions (
+			id, mission_id, mission_type,
+			target_lat, target_lon, target_alt,
+			target_class, priority, reason, status
+		)
+		SELECT
+			id,
+			'MISSION-' || lpad(id::text, 3, '0'),
+			$1, $2, $3, $4, $5,
+			COALESCE($6, 'NORMAL'),
+			COALESCE($7, 'MANUAL_REQUEST'),
+			'REQUESTED'
+		FROM next
+		RETURNING
+			id, mission_id, mission_type,
+			target_lat, target_lon, target_alt,
+			target_class, priority, reason, status, created_at`,
+		req.MissionType,
+		req.TargetLat,
+		req.TargetLon,
+		req.TargetAlt,
+		req.TargetClass,
+		req.Priority,
+		req.Reason,
+	).Scan(
+		&item.ID,
+		&item.MissionID,
+		&item.MissionType,
+		&item.TargetLat,
+		&item.TargetLon,
+		&item.TargetAlt,
+		&item.TargetClass,
+		&item.Priority,
+		&item.Reason,
+		&item.Status,
+		&item.CreatedAt,
+	)
+	return item, err
+}
+
+func handleCreateMissionTool(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.Header().Set("Allow", "POST")
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var req CreateMissionRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		if req.MissionType != "PATROL" && req.MissionType != "INSPECT" {
+			http.Error(w, "mission_type must be PATROL or INSPECT", http.StatusBadRequest)
+			return
+		}
+
+		item, err := createMission(r.Context(), pool, req)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(item)
+	}
+}
+
 func handleObservations(pool *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
@@ -264,6 +342,7 @@ func main() {
 
 	http.HandleFunc("/observations", handleObservations(pool))
 	http.HandleFunc("/tools/observation-history", handleObservationHistory(pool))
+	http.HandleFunc("/tools/create-mission", handleCreateMissionTool(pool))
 
 	http.HandleFunc("/missions", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
@@ -278,49 +357,7 @@ func main() {
 				return
 			}
 
-			var item Mission
-			err := pool.QueryRow(
-				r.Context(),
-				`WITH next AS (
-					SELECT nextval(pg_get_serial_sequence('missions', 'id')) AS id
-				)
-				INSERT INTO missions (
-					id, mission_id, mission_type,
-					target_lat, target_lon, target_alt,
-					target_class, priority, reason, status
-				)
-				SELECT
-					id,
-					'MISSION-' || lpad(id::text, 3, '0'),
-					$1, $2, $3, $4, $5,
-					COALESCE($6, 'NORMAL'),
-					COALESCE($7, 'MANUAL_REQUEST'),
-					'REQUESTED'
-				FROM next
-				RETURNING
-					id, mission_id, mission_type,
-					target_lat, target_lon, target_alt,
-					target_class, priority, reason, status, created_at`,
-				req.MissionType,
-				req.TargetLat,
-				req.TargetLon,
-				req.TargetAlt,
-				req.TargetClass,
-				req.Priority,
-				req.Reason,
-			).Scan(
-				&item.ID,
-				&item.MissionID,
-				&item.MissionType,
-				&item.TargetLat,
-				&item.TargetLon,
-				&item.TargetAlt,
-				&item.TargetClass,
-				&item.Priority,
-				&item.Reason,
-				&item.Status,
-				&item.CreatedAt,
-			)
+			item, err := createMission(r.Context(), pool, req)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
