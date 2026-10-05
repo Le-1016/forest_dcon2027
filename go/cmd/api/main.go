@@ -45,6 +45,15 @@ type Observation struct {
 	CreatedAt           time.Time `json:"created_at"`
 }
 
+type ObservationHistory struct {
+	AreaID       string        `json:"area_id"`
+	SiteID       string        `json:"site_id"`
+	Count        int           `json:"count"`
+	Latest       *Observation  `json:"latest"`
+	Previous     *Observation  `json:"previous"`
+	Observations []Observation `json:"observations"`
+}
+
 type CreateObservationRequest struct {
 	MissionID           *string  `json:"mission_id"`
 	AreaID              *string  `json:"area_id"`
@@ -254,6 +263,7 @@ func main() {
 	})
 
 	http.HandleFunc("/observations", handleObservations(pool))
+	http.HandleFunc("/tools/observation-history", handleObservationHistory(pool))
 
 	http.HandleFunc("/missions", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
