@@ -161,6 +161,17 @@ func handleObservations(pool *pgxpool.Pool) http.HandlerFunc {
 			return
 		}
 
+		areaID := r.URL.Query().Get("area_id")
+		siteID := r.URL.Query().Get("site_id")
+
+		var areaFilter, siteFilter *string
+		if areaID != "" {
+			areaFilter = &areaID
+		}
+		if siteID != "" {
+			siteFilter = &siteID
+		}
+
 		rows, err := pool.Query(
 			r.Context(),
 			`SELECT
@@ -170,7 +181,11 @@ func handleObservations(pool *pgxpool.Pool) http.HandlerFunc {
 				lat, lon, altitude, camera_angle,
 				image_path, class, confidence, ai_model, created_at
 			FROM observations
+			WHERE ($1::text IS NULL OR area_id = $1)
+			  AND ($2::text IS NULL OR site_id = $2)
 			ORDER BY observed_at DESC, id DESC`,
+			areaFilter,
+			siteFilter,
 		)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
