@@ -35,6 +35,19 @@ async function fetchApiMissions() {
   const rows = await response.json();
   return rows.map(apiMission);
 }
+
+async function createApiMission(input) {
+  const response = await fetch('/api/missions', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(input)
+  });
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || 'Mission APIの作成に失敗しました。');
+  }
+  return apiMission(await response.json());
+}
 export const LOW_CONFIDENCE_THRESHOLD = 0.7;
 function valid(state) {
   return state && ['areas','drones','observations','missions','logs'].every(k => Array.isArray(state[k])) &&
@@ -105,15 +118,30 @@ export function createMockRepository(storage) {
     },
     async requestDispatch({type,drone_id,area_id}) {
       if (!['PATROL','INSPECT'].includes(type)) throw new Error('依頼の種類が不正です。');
+
       const drone = state.drones.find(d=>d.id===drone_id);
-      if (!drone || !state.areas.some(a=>a.id===area_id)) throw new Error('機体または区域が見つかりません。');
+      const area = state.areas.find(a=>a.id===area_id);
+      if (!drone || !area) throw new Error('機体または区域が見つかりません。');
       if (drone.status!=='STANDBY') throw new Error('待機中の機体を選んでください。');
-      const existing = state.missions.find(m=>m.drone_id===drone_id && active(m));
-      if (existing) return {mission:copy(existing),duplicate:true};
-      const mission={id:nextId('MIS-',state.missions),drone_id,type,status:'REQUESTED',source:'USER',target:{area_id,observation_id:null},reason:'MANUAL_REQUEST',constraints:{max_altitude_m:20,geofence_required:true},created_at:new Date().toISOString()};
-      state.missions.push(mission);
-      log('MISSION_REQUESTED',drone_id+'の'+(type==='PATROL'?'巡回':'調査')+'Mission '+mission.id+'を要請しました。',{source:'USER',mission_id:mission.id,drone_id});
-      persist(); return {mission:copy(mission),duplicate:false};
+
+      const observations = state.observations
+        .filter(o=>o.area_id===area_id && o.position?.lat!=null && o.position?.lng!=null)
+        .sort((a,b)=>Date.parse(b.captured_at)-Date.parse(a.captured_at));
+
+      const target = observations[0]?.position;
+      if (!target) throw new Error('区域の代表座標が見つかりません。');
+
+      const mission = await createApiMission({
+        mission_type:type,
+        target_lat:target.lat,
+        target_lon:target.lng,
+        target_alt:20,
+        target_class:area_id,
+        priority:'NORMAL',
+        reason:'MANUAL_REQUEST'
+      });
+
+      return {mission,duplicate:false};
     },
     async requestReobserve(id) {
       const observation=state.observations.find(o=>o.id===id);
