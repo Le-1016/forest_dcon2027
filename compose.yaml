@@ -17,7 +17,7 @@ services:
     working_dir: /workspace
     environment:
       DATABASE_URL: postgresql://forest_user:forest_password@postgres:5432/forest_db
-      OPENROUTER_API_KEY: \${OPENROUTER_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
     ports:
       - "8080:8080"
     volumes:

@@ -341,9 +341,9 @@ func main() {
 	})
 
 	http.HandleFunc("/observations", handleObservations(pool))
+	http.HandleFunc("/ai/chat", handleAIChat(pool))
 	http.HandleFunc("/tools/observation-history", handleObservationHistory(pool))
 	http.HandleFunc("/tools/create-mission", handleCreateMissionTool(pool))
-
 	http.HandleFunc("/missions", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			var req CreateMissionRequest
