@@ -26,31 +26,39 @@ type Mission struct {
 }
 
 type Observation struct {
-	ID            int64     `json:"id"`
-	ObservationID string    `json:"observation_id"`
-	MissionID     *string   `json:"mission_id"`
-	ObservedAt    time.Time `json:"observed_at"`
-	Lat           *float64  `json:"lat"`
-	Lon           *float64  `json:"lon"`
-	Altitude      *float64  `json:"altitude"`
-	CameraAngle   *float64  `json:"camera_angle"`
-	ImagePath     *string   `json:"image_path"`
-	Class         *string   `json:"class"`
-	Confidence    *float64  `json:"confidence"`
-	AIModel       *string   `json:"ai_model"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID                  int64     `json:"id"`
+	ObservationID       string    `json:"observation_id"`
+	MissionID           *string   `json:"mission_id"`
+	AreaID              *string   `json:"area_id"`
+	SiteID              *string   `json:"site_id"`
+	DroneID             *string   `json:"drone_id"`
+	ParentObservationID *string   `json:"parent_observation_id"`
+	ObservedAt          time.Time `json:"observed_at"`
+	Lat                 *float64  `json:"lat"`
+	Lon                 *float64  `json:"lon"`
+	Altitude            *float64  `json:"altitude"`
+	CameraAngle         *float64  `json:"camera_angle"`
+	ImagePath           *string   `json:"image_path"`
+	Class               *string   `json:"class"`
+	Confidence          *float64  `json:"confidence"`
+	AIModel             *string   `json:"ai_model"`
+	CreatedAt           time.Time `json:"created_at"`
 }
 
 type CreateObservationRequest struct {
-	MissionID   *string  `json:"mission_id"`
-	Lat         *float64 `json:"lat"`
-	Lon         *float64 `json:"lon"`
-	Altitude    *float64 `json:"altitude"`
-	CameraAngle *float64 `json:"camera_angle"`
-	ImagePath   *string  `json:"image_path"`
-	Class       *string  `json:"class"`
-	Confidence  *float64 `json:"confidence"`
-	AIModel     *string  `json:"ai_model"`
+	MissionID           *string  `json:"mission_id"`
+	AreaID              *string  `json:"area_id"`
+	SiteID              *string  `json:"site_id"`
+	DroneID             *string  `json:"drone_id"`
+	ParentObservationID *string  `json:"parent_observation_id"`
+	Lat                 *float64 `json:"lat"`
+	Lon                 *float64 `json:"lon"`
+	Altitude            *float64 `json:"altitude"`
+	CameraAngle         *float64 `json:"camera_angle"`
+	ImagePath           *string  `json:"image_path"`
+	Class               *string  `json:"class"`
+	Confidence          *float64 `json:"confidence"`
+	AIModel             *string  `json:"ai_model"`
 }
 
 type CreateMissionRequest struct {
@@ -84,20 +92,29 @@ func handleObservations(pool *pgxpool.Pool) http.HandlerFunc {
 					SELECT nextval(pg_get_serial_sequence('observations', 'id')) AS id
 				)
 				INSERT INTO observations (
-					id, observation_id, mission_id,
+					id, observation_id,
+					mission_id, area_id, site_id, drone_id, parent_observation_id,
 					lat, lon, altitude, camera_angle,
 					image_path, class, confidence, ai_model
 				)
 				SELECT
 					id,
 					'OBS-' || lpad(id::text, 4, '0'),
-					$1, $2, $3, $4, $5, $6, $7, $8, $9
+					$1, $2, $3, $4, $5,
+					$6, $7, $8, $9,
+					$10, $11, $12, $13
 				FROM next
 				RETURNING
-					id, observation_id, mission_id, observed_at,
+					id, observation_id,
+					mission_id, area_id, site_id, drone_id, parent_observation_id,
+					observed_at,
 					lat, lon, altitude, camera_angle,
 					image_path, class, confidence, ai_model, created_at`,
 				req.MissionID,
+				req.AreaID,
+				req.SiteID,
+				req.DroneID,
+				req.ParentObservationID,
 				req.Lat,
 				req.Lon,
 				req.Altitude,
@@ -110,6 +127,10 @@ func handleObservations(pool *pgxpool.Pool) http.HandlerFunc {
 				&item.ID,
 				&item.ObservationID,
 				&item.MissionID,
+				&item.AreaID,
+				&item.SiteID,
+				&item.DroneID,
+				&item.ParentObservationID,
 				&item.ObservedAt,
 				&item.Lat,
 				&item.Lon,
@@ -143,7 +164,9 @@ func handleObservations(pool *pgxpool.Pool) http.HandlerFunc {
 		rows, err := pool.Query(
 			r.Context(),
 			`SELECT
-				id, observation_id, mission_id, observed_at,
+				id, observation_id,
+				mission_id, area_id, site_id, drone_id, parent_observation_id,
+				observed_at,
 				lat, lon, altitude, camera_angle,
 				image_path, class, confidence, ai_model, created_at
 			FROM observations
@@ -162,6 +185,10 @@ func handleObservations(pool *pgxpool.Pool) http.HandlerFunc {
 				&item.ID,
 				&item.ObservationID,
 				&item.MissionID,
+				&item.AreaID,
+				&item.SiteID,
+				&item.DroneID,
+				&item.ParentObservationID,
 				&item.ObservedAt,
 				&item.Lat,
 				&item.Lon,
