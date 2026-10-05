@@ -25,6 +25,34 @@ type Mission struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
+type Observation struct {
+	ID            int64     `json:"id"`
+	ObservationID string    `json:"observation_id"`
+	MissionID     *string   `json:"mission_id"`
+	ObservedAt    time.Time `json:"observed_at"`
+	Lat           *float64  `json:"lat"`
+	Lon           *float64  `json:"lon"`
+	Altitude      *float64  `json:"altitude"`
+	CameraAngle   *float64  `json:"camera_angle"`
+	ImagePath     *string   `json:"image_path"`
+	Class         *string   `json:"class"`
+	Confidence    *float64  `json:"confidence"`
+	AIModel       *string   `json:"ai_model"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+type CreateObservationRequest struct {
+	MissionID   *string  `json:"mission_id"`
+	Lat         *float64 `json:"lat"`
+	Lon         *float64 `json:"lon"`
+	Altitude    *float64 `json:"altitude"`
+	CameraAngle *float64 `json:"camera_angle"`
+	ImagePath   *string  `json:"image_path"`
+	Class       *string  `json:"class"`
+	Confidence  *float64 `json:"confidence"`
+	AIModel     *string  `json:"ai_model"`
+}
+
 type CreateMissionRequest struct {
 	MissionType string   `json:"mission_type"`
 	TargetLat   *float64 `json:"target_lat"`
@@ -33,6 +61,134 @@ type CreateMissionRequest struct {
 	TargetClass *string  `json:"target_class"`
 	Priority    *string  `json:"priority"`
 	Reason      *string  `json:"reason"`
+}
+
+func handleObservations(pool *pgxpool.Pool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			var req CreateObservationRequest
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, "invalid JSON", http.StatusBadRequest)
+				return
+			}
+
+			if req.Confidence != nil && (*req.Confidence < 0 || *req.Confidence > 1) {
+				http.Error(w, "confidence must be between 0 and 1", http.StatusBadRequest)
+				return
+			}
+
+			var item Observation
+			err := pool.QueryRow(
+				r.Context(),
+				`WITH next AS (
+					SELECT nextval(pg_get_serial_sequence('observations', 'id')) AS id
+				)
+				INSERT INTO observations (
+					id, observation_id, mission_id,
+					lat, lon, altitude, camera_angle,
+					image_path, class, confidence, ai_model
+				)
+				SELECT
+					id,
+					'OBS-' || lpad(id::text, 4, '0'),
+					$1, $2, $3, $4, $5, $6, $7, $8, $9
+				FROM next
+				RETURNING
+					id, observation_id, mission_id, observed_at,
+					lat, lon, altitude, camera_angle,
+					image_path, class, confidence, ai_model, created_at`,
+				req.MissionID,
+				req.Lat,
+				req.Lon,
+				req.Altitude,
+				req.CameraAngle,
+				req.ImagePath,
+				req.Class,
+				req.Confidence,
+				req.AIModel,
+			).Scan(
+				&item.ID,
+				&item.ObservationID,
+				&item.MissionID,
+				&item.ObservedAt,
+				&item.Lat,
+				&item.Lon,
+				&item.Altitude,
+				&item.CameraAngle,
+				&item.ImagePath,
+				&item.Class,
+				&item.Confidence,
+				&item.AIModel,
+				&item.CreatedAt,
+			)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			if err := json.NewEncoder(w).Encode(item); err != nil {
+				log.Printf("encode observation response: %v", err)
+			}
+			return
+		}
+
+		if r.Method != http.MethodGet {
+			w.Header().Set("Allow", "GET, POST")
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		rows, err := pool.Query(
+			r.Context(),
+			`SELECT
+				id, observation_id, mission_id, observed_at,
+				lat, lon, altitude, camera_angle,
+				image_path, class, confidence, ai_model, created_at
+			FROM observations
+			ORDER BY observed_at DESC, id DESC`,
+		)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		items := make([]Observation, 0)
+		for rows.Next() {
+			var item Observation
+			if err := rows.Scan(
+				&item.ID,
+				&item.ObservationID,
+				&item.MissionID,
+				&item.ObservedAt,
+				&item.Lat,
+				&item.Lon,
+				&item.Altitude,
+				&item.CameraAngle,
+				&item.ImagePath,
+				&item.Class,
+				&item.Confidence,
+				&item.AIModel,
+				&item.CreatedAt,
+			); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			items = append(items, item)
+		}
+
+		if err := rows.Err(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(items); err != nil {
+			log.Printf("encode observations response: %v", err)
+		}
+	}
 }
 
 func main() {
@@ -54,6 +210,8 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("ok\n"))
 	})
+
+	http.HandleFunc("/observations", handleObservations(pool))
 
 	http.HandleFunc("/missions", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
