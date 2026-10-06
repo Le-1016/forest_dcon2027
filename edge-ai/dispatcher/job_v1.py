@@ -1,4 +1,5 @@
 from dataclasses import asdict, dataclass
+import argparse
 import json
 
 
@@ -32,14 +33,25 @@ class ForestEdgeTrainJob:
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Create a FOREST Edge AI training job"
+    )
+    parser.add_argument("--git-commit", required=True)
+    parser.add_argument("--dataset-id", required=True)
+    parser.add_argument("--epochs", type=int, default=3)
+    parser.add_argument("--batch-size", type=int, default=8)
+    parser.add_argument("--image-size", type=int, default=224)
+    parser.add_argument("--pretrained", action="store_true")
+    args = parser.parse_args()
+
     job = ForestEdgeTrainJob(
         job_type="FOREST_EDGE_TRAIN",
-        git_commit="2b40693",
-        dataset_id="forest-smoke-v0",
-        epochs=3,
-        batch_size=8,
-        image_size=224,
-        pretrained=False,
+        git_commit=args.git_commit,
+        dataset_id=args.dataset_id,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        image_size=args.image_size,
+        pretrained=args.pretrained,
     )
 
     print(job.to_json())
