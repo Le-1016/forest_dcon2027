@@ -4,7 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from datasets import resolve_dataset
+from datasets import load_manifest, resolve_dataset
 from job_v1 import ForestEdgeTrainJob
 
 
@@ -35,6 +35,7 @@ def main():
     args = parser.parse_args()
 
     job = load_job(Path(args.job))
+    manifest = load_manifest(job.dataset_id)
     dataset_path = resolve_dataset(job.dataset_id)
 
     command = [
@@ -42,6 +43,10 @@ def main():
         str(TRAIN_SCRIPT),
         "--data",
         str(dataset_path),
+        "--dataset-id",
+        job.dataset_id,
+        "--dataset-task",
+        manifest["task"],
         "--output",
         args.output,
         "--epochs",
@@ -58,6 +63,7 @@ def main():
     print(f"JOB_TYPE={job.job_type}")
     print(f"GIT_COMMIT={job.git_commit}")
     print(f"DATASET_ID={job.dataset_id}")
+    print(f"DATASET_TASK={manifest['task']}")
     print("TRAIN_COMMAND")
     print(subprocess.list2cmdline(command))
 

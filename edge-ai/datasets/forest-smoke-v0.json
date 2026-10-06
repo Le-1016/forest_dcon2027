@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "dataset_id": "forest-smoke-v0",
+  "name": "FOREST Smoke Dataset v0",
+  "task": "image_classification",
+  "status": "synthetic_test",
+  "classes": [
+    "DISCOLORATION",
+    "NORMAL"
+  ],
+  "splits": {
+    "train": "train",
+    "validation": "val"
+  },
+  "provenance": {
+    "source": "synthetic",
+    "description": "Artificial images generated only for FOREST pipeline validation.",
+    "field_data": false
+  },
+  "intended_use": "Pipeline and GPU dispatcher validation only.",
+  "scientific_use": false
+}

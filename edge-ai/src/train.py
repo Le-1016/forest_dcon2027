@@ -39,6 +39,8 @@ def main():
         description="Train FOREST Edge AI image classifier"
     )
     parser.add_argument("--data", required=True)
+    parser.add_argument("--dataset-id", required=True)
+    parser.add_argument("--dataset-task", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--batch-size", type=int, default=16)
@@ -133,6 +135,8 @@ def main():
     )
 
     metadata = {
+        "dataset_id": args.dataset_id,
+        "dataset_task": args.dataset_task,
         "architecture": "mobilenet_v3_small",
         "classes": classes,
         "num_classes": len(classes),
