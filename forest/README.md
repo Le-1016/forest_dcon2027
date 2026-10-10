@@ -1,15 +1,9 @@
+# FOREST: public showcase and VPS monitor
 
-## ホーム画面
-郵便番号で気象を検索し、天候に合わせて背景を切り替えます。郵便番号のみブラウザーに保存し、起動時に最新データを取得します。
-zipcloud → 国土地理院の市区町村代表点 → Open-Meteo（モデル推定、実測ではない）を使用。外部地図表示やAPIキーは不要です。通信失敗・不正入力時は気象数値を表示しません。
-巡回・調査の要請はrequestDispatchでMissionとLOGを作成します。機体のSTANDBY状態は変更せず、実機は起動しません。同じ機体の進行中依頼を重複作成しません。
-気象サービスはweather.jsに分離。無料Open-Meteoエンドポイントは非商用利用向けです。商用化時は利用プランを見直してください。
+- GitHub Pages `/forest/`: `index.html`, `css/showcase.css`, `js/showcase.js`. Public project introduction and an isolated, in-memory simulation. No operational API requests or saved mission changes.
+- VPS web root `/`: nginx serves `monitor.html`. `js/monitor-entry.js` checks the same-origin `/api/health` before loading the existing application. GitHub Pages hosts are explicitly blocked from loading this operational app.
+- Existing `app.js`, `store.js`, weather, observation history and app styles remain the operational frontend. Telemetry and forest images are currently demonstration data; API connectivity does not imply a connected physical drone.
+- Start/reload the existing Docker web service after updating `nginx/default.conf`. Keep existing localhost port bindings and access controls. The frontend health gate is not authentication; protect operational access separately.
+- The public simulation uses fixed values (54% to 92%, 15m to 8m), not measured model performance. Jetson/ROS 2/PX4 integration and field validation are planned.
 
-### 地域設定の保存と削除
-有効な郵便番号で気象取得が成功すると forest.postal.v1 を保存します。保存後は入力欄を隠し、再訪時には保存地域の最新気象を自動取得します。「地域設定を削除」で郵便番号だけを削除し、別の地域を設定できます。MissionやLOGは削除しません。気象取得中の削除でも古い応答で設定が復活しません。ブラウザーの保存データを消した場合や別のブラウザーでは再設定が必要です。
-
-## 継続観測とAI自動再観測
-同じarea_id + site_idの撮影日時順で比較します。area_idだけでは比較しません。前回は選択観測より古い同一地点の直近観測です。撮影角度は真下を0度としたデモ値です。画像差分計算は未実装です。
-最新観測のconfidenceが0.7未満なら、Mock repositoryがAIを要求元としてREOBSERVEを一度生成しLOGに記録します。再読み込みや完了後に同じ観測へ自動要求を繰り返しません。古いlocalStorageを移行し、既存のMissionとLOGを保持します。
-再観測デモはREQUESTED → RUNNING → COMPLETEDをボタンで進めます。15m→8m、撮影角度45→25度、機首方位90→135度で撮影する計画を表示し、92%の再判定観測を新規追加します。元の観測は上書きしません。結果は固定のシミュレーションで、実際の飛行・推論・GPU学習は行いません。
-Go APIへの移行では、最新観測取り込み時のルール評価、Missionと監査ログのトランザクション、観測単位の冪等性、位置・飛行条件の検証をサーバー側で実装してください。実機接続前のフロントデモに限定しています。
+Static preview: serve this repository and open `/forest/`. All showcase assets use relative URLs and work under GitHub Pages repository paths. No external map API or build step is required.
