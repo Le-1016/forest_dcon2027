@@ -340,6 +340,7 @@ func main() {
 		_, _ = w.Write([]byte("ok\n"))
 	})
 
+	http.Handle("/ml/", trainingProxy())
 	http.HandleFunc("/observations", handleObservations(pool))
 	http.HandleFunc("/ai/chat", handleAIChat(pool))
 	http.HandleFunc("/tools/observation-history", handleObservationHistory(pool))

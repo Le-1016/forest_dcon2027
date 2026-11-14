@@ -32,3 +32,7 @@ Mission DTOは target.area_id / observation_id、reason、constraints.max_altitu
 geofence_required を持ちます。Jetson / ROS 2 / PX4への配送・受理・実行状態は
 バックエンドが担い、REQUESTEDだけで飛行開始とみなしません。
 実機接続では認証・承認・ジオフェンス検証・通信断処理が別途必要です。
+
+## 火災と煙の機械学習モニター
+
+管理画面の「機械学習」でPCのGPU学習を依頼し、進捗・検証結果・モデルを確認できます。起動と画像の配置は [ml/README.md](ml/README.md) を参照してください。公開の作品紹介ページからは学習を実行しません。

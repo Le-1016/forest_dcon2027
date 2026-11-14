@@ -1,0 +1,4 @@
+# Install GPU PyTorch separately from the official cu128 index for the RTX 5050.
+# Existing forest_gpu environment can be reused; torchvision is not required.
+numpy>=2.0,<3
+Pillow>=11,<13

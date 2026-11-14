@@ -1,0 +1,22 @@
+# Opt-in: docker compose -f compose.yaml -f compose.ml.yaml up -d ml api web
+services:
+  ml:
+    build:
+      context: .
+      dockerfile: ml/Dockerfile
+    restart: unless-stopped
+    environment:
+      FOREST_ML_TOKEN: ${FOREST_ML_TOKEN:?Set a monitor token of at least 24 characters}
+      FOREST_ML_WORKER_TOKEN: ${FOREST_ML_WORKER_TOKEN:?Set a different worker token of at least 24 characters}
+    volumes:
+      - ml-state:/state
+    # No host port: access via the Go API and existing private web entry point.
+  api:
+    environment:
+      FOREST_ML_URL: http://ml:8090
+  web:
+    volumes:
+      - ./nginx/ml-limits.conf:/etc/nginx/conf.d/ml-limits.conf:ro
+
+volumes:
+  ml-state:

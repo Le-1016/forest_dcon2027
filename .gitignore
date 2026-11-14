@@ -230,3 +230,9 @@ julia/Manifest.toml
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local training state, images and secrets
+.ml-state/
+.ml-runs/
+ml/datasets/
+ml/.env
