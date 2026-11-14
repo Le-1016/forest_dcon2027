@@ -1,8 +1,9 @@
+import { mountTraining } from './training.js';
 import { store } from './store.js';
 import { lookupWeather } from './weather.js';
 import { observationHistory, previousObservation, latestPerSite } from './observation-history.js';
-const views=['home','map','observations','missions','drone','log'];
-const labels={home:'ホーム',map:'森林マップ',observations:'観測結果',missions:'調査依頼',drone:'機体情報',log:'活動ログ'};
+const views=['home','map','observations','missions','drone','log','training'];
+const labels={home:'ホーム',map:'森林マップ',observations:'観測結果',missions:'調査依頼',drone:'機体情報',log:'活動ログ',training:'機械学習'};
 const e=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const date=value=>new Date(value).toLocaleString('ja-JP');
 const badge=value=>'<span class="badge '+e(value.toLowerCase())+'">'+e(value)+'</span>';
@@ -96,7 +97,9 @@ function detail(data,o){
  return link('observations','← 観測一覧')+'<div class="detail observation-detail"><div>'+comparison(data,o)+(mission?'<article class="card reobserve-card">'+missionFlow(mission,data)+'</article>':'')+'</div><article class="card observation-metadata">'+badge(o.status)+'<h2>'+e(o.label)+'</h2><p>'+e(o.note)+'</p><div class="confidence"><strong>'+Math.round(o.confidence*100)+'%</strong> AI Confidence</div><h3>観測メタデータ</h3>'+captureMetadata(o)+(o.parent_observation_id?link('observations/'+o.parent_observation_id,'再観測前の観測を見る'):'')+'<p class="muted">再観測条件：高度上限20m / ジオフェンス必須</p><button class="primary" data-reobserve="'+e(o.id)+'" '+(busy||existing?'disabled':'')+'>'+(existing?'再観測依頼済み · '+e(existing.id):busy?'作成中…':'手動で再観測を依頼する')+'</button>'+link('missions','Mission一覧を見る')+'</article></div>';
 }
 
+let trainingCleanup;
 function render(){
+ trainingCleanup?.(); trainingCleanup=null;
  const {data,persistent}=store.getSnapshot();
  const [raw,id]=location.hash.slice(1).split('/');const view=views.includes(raw)?raw:'home';
  document.querySelector('nav').innerHTML=views.map(v=>'<a href="#'+v+'" '+(v===view?'aria-current="page"':'')+'><span>'+v.toUpperCase()+'</span>'+labels[v]+'</a>').join('');
@@ -117,6 +120,7 @@ function render(){
  if(view==='drone') html+='<div class="grid">'+data.drones.map(d=>'<article class="card"><p class="eyebrow">SURVEY VEHICLE</p><h2>'+e(d.id)+'</h2>'+badge(d.status)+'<div class="battery"><span style="width:'+d.battery_pct+'%"></span></div>'+dl([['バッテリー',d.battery_pct+'%'],['GPS',d.gps],['Jetson',d.jetson],['高度',d.altitude_m+' m'],['緯度 / 経度',d.position.lat+' / '+d.position.lng],['最終受信',date(d.last_seen_at)]])+'<p class="muted">サンプルの機体テレメトリーです。</p></article>').join('')+'</div>';
  if(view==='log') html+='<div class="timeline">'+data.logs.map(l=>'<article class="card"><p class="eyebrow">'+e(l.event)+'</p><h3>'+e(l.message)+'</h3><p class="muted">'+e(date(l.time))+' · '+e(l.id)+'</p>'+(l.mission_id?link('missions',l.mission_id+'を確認'):'')+'</article>').join('')+'</div>';
  content.innerHTML=html;
+ if(view==='training'){const panel=document.createElement('div');content.append(panel);trainingCleanup=mountTraining(panel);}
 }
 content.addEventListener('input',event=>{if(event.target.id==='postal')postal=event.target.value;});
 content.addEventListener('submit',async event=>{
